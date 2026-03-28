@@ -47,10 +47,55 @@ export function TestAttemptScreen({ attemptId }: Props) {
 
   // ─── Derived data ────────────────────────────────────────────────────────────
   const sections = data?.test ? (data as { attempt: unknown; questions: unknown[]; test: { language: string }; sections?: TestSection[] }).sections ?? [] : [] as TestSection[];
-  const allQuestions = data?.questions ?? [];
-  const filteredQuestions = activeSection === 'all'
-    ? allQuestions
-    : allQuestions.filter(q => q.sectionId === activeSection);
+  const allQuestions = (data?.questions ?? []) as Question[];
+
+  const subjectOptions = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const q of allQuestions) {
+      const s = (q.subject || '').trim();
+      if (!s) continue;
+      m.set(s, (m.get(s) || 0) + 1);
+    }
+    return [...m.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+  }, [allQuestions]);
+
+  const filteredQuestions = useMemo(() => {
+    if (filterKey === 'all') return allQuestions;
+    if (filterKey.startsWith('sec:')) {
+      const sid = parseInt(filterKey.slice(4), 10);
+      if (Number.isNaN(sid)) return allQuestions;
+      return allQuestions.filter(q => q.sectionId === sid);
+    }
+    if (filterKey.startsWith('subj:')) {
+      const name = decodeURIComponent(filterKey.slice(5));
+      return allQuestions.filter(q => (q.subject || '').trim() === name);
+    }
+    return allQuestions;
+  }, [allQuestions, filterKey]);
+
+  const filterSummary = useMemo(() => {
+    if (filterKey === 'all') {
+      return sections.length > 0
+        ? `All subjects · ${allQuestions.length} questions`
+        : `All questions · ${allQuestions.length}`;
+    }
+    if (filterKey.startsWith('sec:')) {
+      const sid = parseInt(filterKey.slice(4), 10);
+      const s = sections.find(x => x.id === sid);
+      return s ? `${s.name} · ${filteredQuestions.length} questions` : 'Subject';
+    }
+    if (filterKey.startsWith('subj:')) {
+      const name = decodeURIComponent(filterKey.slice(5));
+      return `${name} · ${filteredQuestions.length} questions`;
+    }
+    return `All questions · ${allQuestions.length}`;
+  }, [filterKey, allQuestions.length, filteredQuestions.length, sections]);
+
+  const showSubjectFilter = sections.length > 0 || subjectOptions.length > 0;
+
+  useEffect(() => {
+    setFilterKey('all');
+  }, [attemptId]);
 
   // Remap currentIndex to filtered list
   const currentFilteredIndex = filteredQuestions.findIndex(q => q.id === allQuestions[currentIndex]?.id);
@@ -181,46 +226,54 @@ export function TestAttemptScreen({ attemptId }: Props) {
         {/* ── LEFT: QUESTION PANEL ─────────────────────────────────────────── */}
         <main className="flex-1 flex flex-col overflow-hidden bg-white border-r border-slate-200">
 
-          {/* Section filter + Translation bar */}
+          {/* Subject filter + Translation bar */}
           <div className="border-b border-slate-200 bg-slate-50 px-4 py-2 flex items-center gap-3 flex-wrap shrink-0">
-            {/* Subject/Section dropdown */}
             <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold text-slate-500 whitespace-nowrap">Section:</span>
-              <div className="relative">
-                <select
-                  value={activeSection}
-                  onChange={e => {
-                    const val = e.target.value === 'all' ? 'all' : parseInt(e.target.value);
-                    setActiveSection(val);
-                    // Navigate to first question in section
-                    if (val !== 'all') {
-                      const firstQ = allQuestions.find(q => q.sectionId === val);
-                      if (firstQ) navigateTo(allQuestions.indexOf(firstQ));
-                    } else {
-                      navigateTo(0);
-                    }
-                  }}
-                  className="appearance-none bg-white border border-slate-200 rounded-lg pl-3 pr-8 py-1.5 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30 cursor-pointer"
-                >
-                  <option value="all">All Sections ({allQuestions.length} Qs)</option>
-                  {sections.map(s => (
-                    <option key={s.id} value={s.id}>
-                      {s.name} ({s.questionCount} Qs)
+              <span className="text-xs font-semibold text-slate-500 whitespace-nowrap">Subject:</span>
+              {showSubjectFilter ? (
+                <div className="relative">
+                  <select
+                    value={filterKey}
+                    onChange={e => {
+                      const val = e.target.value;
+                      setFilterKey(val);
+                      if (val === 'all') {
+                        navigateTo(0);
+                        return;
+                      }
+                      if (val.startsWith('sec:')) {
+                        const sid = parseInt(val.slice(4), 10);
+                        const firstQ = allQuestions.find(q => q.sectionId === sid);
+                        if (firstQ) navigateTo(allQuestions.indexOf(firstQ));
+                        return;
+                      }
+                      if (val.startsWith('subj:')) {
+                        const name = decodeURIComponent(val.slice(5));
+                        const firstQ = allQuestions.find(q => (q.subject || '').trim() === name);
+                        if (firstQ) navigateTo(allQuestions.indexOf(firstQ));
+                      }
+                    }}
+                    className="appearance-none bg-white border border-slate-200 rounded-lg pl-3 pr-8 py-1.5 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30 cursor-pointer max-w-[min(100vw-8rem,20rem)]"
+                  >
+                    <option value="all">
+                      {sections.length > 0 ? `All subjects (${allQuestions.length} Qs)` : `All questions (${allQuestions.length} Qs)`}
                     </option>
-                  ))}
-                  {/* Fallback subject options if no sections defined */}
-                  {sections.length === 0 && [
-                    { id: 'math', name: 'Mathematics' },
-                    { id: 'science', name: 'Science' },
-                    { id: 'english', name: 'English' },
-                    { id: 'gk', name: 'General Knowledge' },
-                    { id: 'reasoning', name: 'Reasoning' },
-                  ].map(s => (
-                    <option key={s.id} value={s.id}>{s.name}</option>
-                  ))}
-                </select>
-                <ChevronDown size={13} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-              </div>
+                    {sections.map(s => (
+                      <option key={s.id} value={`sec:${s.id}`}>
+                        {s.name} ({s.questionCount} Qs)
+                      </option>
+                    ))}
+                    {sections.length === 0 && subjectOptions.map(([name, count]) => (
+                      <option key={name} value={`subj:${encodeURIComponent(name)}`}>
+                        {name} ({count} Qs)
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown size={13} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                </div>
+              ) : (
+                <span className="text-sm text-slate-600">Single paper ({allQuestions.length} Qs)</span>
+              )}
             </div>
 
             <div className="flex-1" />
@@ -432,13 +485,10 @@ export function TestAttemptScreen({ attemptId }: Props) {
             </div>
           </div>
 
-          {/* Section/Subject info */}
+          {/* Subject info */}
           <div className="px-4 py-2.5 bg-blue-50 border-b border-blue-100">
             <p className="text-xs text-blue-600 font-semibold">
-              {activeSection === 'all'
-                ? `All Sections · ${allQuestions.length} Questions`
-                : sections.find(s => s.id === activeSection)?.name ?? 'Section'
-              }
+              {filterSummary}
             </p>
             <p className="text-xs text-slate-500 mt-0.5">Question Palette</p>
           </div>
@@ -513,8 +563,7 @@ export function TestAttemptScreen({ attemptId }: Props) {
         currentQ={currentQ}
         stats={stats}
         user={user}
-        sections={sections}
-        activeSection={activeSection}
+        filterSummary={filterSummary}
         navigateTo={navigateTo}
         onSubmit={() => setConfirmOpen(true)}
       />
@@ -570,16 +619,15 @@ export function TestAttemptScreen({ attemptId }: Props) {
 // ─── Mobile Palette Component ─────────────────────────────────────────────────
 function MobilePalette({
   filteredQuestions, allQuestions, answers, currentQ, stats, user,
-  sections, activeSection, navigateTo, onSubmit,
+  filterSummary, navigateTo, onSubmit,
 }: {
-  filteredQuestions: ReturnType<typeof Array<import('@/types').Question>>;
-  allQuestions: ReturnType<typeof Array<import('@/types').Question>>;
+  filteredQuestions: Question[];
+  allQuestions: Question[];
   answers: Record<number, import('@/types').QuestionAttempt>;
-  currentQ: import('@/types').Question | undefined;
+  currentQ: Question | undefined;
   stats: { answered: number; notAnswered: number; marked: number; notVisited: number };
   user: import('@/types').User | null;
-  sections: TestSection[];
-  activeSection: number | 'all';
+  filterSummary: string;
   navigateTo: (idx: number) => void;
   onSubmit: () => void;
 }) {
@@ -614,6 +662,7 @@ function MobilePalette({
               </button>
             </div>
 
+            <p className="px-4 pt-3 text-xs font-semibold text-slate-600">{filterSummary}</p>
             <div className="grid grid-cols-4 gap-2 p-4 border-b border-slate-100">
               {[
                 { label: 'Answered', count: stats.answered, cls: 'bg-green-50 text-green-700' },

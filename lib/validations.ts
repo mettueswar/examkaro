@@ -101,9 +101,11 @@ export const packageSchema = z.object({
   price: z.number().min(0),
   discountedPrice: z.number().min(0).optional(),
   validityDays: z.number().int().min(1).max(3650).default(365),
-  testIds: z.array(z.number().int().positive()),
-  /** Max mock tests unlocked from testIds (first N in order). Null/omit = all selected tests. */
-  mockTestAccessLimit: z.number().int().positive().max(10_000).nullish(),
+  testIds: z.array(z.number().int().positive()).default([]),
+  /** Max mock tests unlocked from testIds (first N in order). Null = all selected tests. */
+  mockTestAccessLimit: z
+    .union([z.number().int().positive().max(10_000), z.null()])
+    .optional(),
   categoryIds: z.array(z.number().int().positive()).optional(),
   features: z.array(z.string()).default([]),
   isActive: z.boolean().default(true),

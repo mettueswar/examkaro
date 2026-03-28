@@ -3,10 +3,8 @@ import { queryOne, query } from '@/lib/db';
 import { errorResponse, successResponse } from '@/lib/security';
 import { verifyRequest, unauthorizedResponse, forbiddenResponse } from '@/lib/auth/jwt';
 import type { MockTest, Question, TestSection } from '@/types';
-import {
-  hasFullPremiumPlan,
-  userCanAccessPremiumTestViaPackage,
-} from '@/lib/package-test-access';
+import { hasFullPremiumPlan } from '@/lib/package-test-shared';
+import { userCanAccessPremiumTestViaPackage } from '@/lib/package-test-access';
 
 export async function GET(
   req: NextRequest,

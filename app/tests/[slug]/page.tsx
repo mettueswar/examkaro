@@ -5,10 +5,8 @@ import { Header } from '@/components/layout/Header';
 import { TestStartClient } from '@/components/test/TestStartClient';
 import type { MockTest, TestSection } from '@/types';
 import { getAuthPayload } from '@/lib/auth/jwt';
-import {
-  hasFullPremiumPlan,
-  userCanAccessPremiumTestViaPackage,
-} from '@/lib/package-test-access';
+import { hasFullPremiumPlan } from '@/lib/package-test-shared';
+import { userCanAccessPremiumTestViaPackage } from '@/lib/package-test-access';
 
 interface Props {
   params: Promise<{ slug: string }>;

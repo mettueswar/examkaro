@@ -21,7 +21,8 @@ export async function POST(req: NextRequest) {
     if (!test) return errorResponse('Test not found', 404);
 
     if (test.type === 'premium') {
-      const { hasFullPremiumPlan, userCanAccessPremiumTestViaPackage } = await import(
+      const { hasFullPremiumPlan } = await import('@/lib/package-test-shared');
+      const { userCanAccessPremiumTestViaPackage } = await import(
         '@/lib/package-test-access'
       );
       if (!hasFullPremiumPlan(auth.plan)) {

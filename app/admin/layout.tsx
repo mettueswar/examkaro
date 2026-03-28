@@ -10,7 +10,7 @@ const ADMIN_NAV = [
   { label: 'Overview', href: '/admin', icon: LayoutDashboard },
   { label: 'Mock Tests', href: '/admin/tests', icon: BookOpen },
   { label: 'Questions', href: '/admin/questions', icon: FileQuestion },
-  { label: 'Sections', href: '/admin/sections', icon: FolderOpen },
+  { label: 'Subjects', href: '/admin/subjects', icon: FolderOpen },
   { label: 'Categories', href: '/admin/categories', icon: FolderOpen },
   { label: 'Packages', href: '/admin/packages', icon: Package },
   { label: 'News', href: '/admin/news', icon: Newspaper },

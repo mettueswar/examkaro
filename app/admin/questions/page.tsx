@@ -104,6 +104,7 @@ export default function AdminQuestionsPage() {
                 <tr className="bg-surface-50 border-b border-surface-100">
                   <th className="text-left px-4 py-3 text-xs font-semibold text-surface-500 uppercase w-12">#</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-surface-500 uppercase">Question</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-surface-500 uppercase">Subject</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-surface-500 uppercase">Type</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-surface-500 uppercase">Marks</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-surface-500 uppercase">Difficulty</th>
@@ -119,6 +120,9 @@ export default function AdminQuestionsPage() {
                         className="text-surface-800 line-clamp-2 text-xs leading-relaxed"
                         dangerouslySetInnerHTML={{ __html: q.text }}
                       />
+                    </td>
+                    <td className="px-4 py-3 text-surface-600 text-xs max-w-[8rem] truncate" title={q.subject || undefined}>
+                      {q.subject?.trim() || '—'}
                     </td>
                     <td className="px-4 py-3 text-surface-600 text-xs uppercase">{q.type}</td>
                     <td className="px-4 py-3 text-surface-600 text-xs">+{q.marks} / -{q.negativeMarks}</td>

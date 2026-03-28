@@ -4,14 +4,23 @@ import { useState, useEffect, useCallback } from 'react';
 import { Plus, Pencil, Trash2, Save, X, Check } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { formatCurrency } from '@/lib/utils';
-import type { Package } from '@/types';
+import type { Package, MockTest } from '@/types';
+import { accessibleMockTestCount } from '@/lib/package-test-shared';
 
 export default function AdminPackagesPage() {
   const [packages, setPackages] = useState<Package[]>([]);
+  const [allTests, setAllTests] = useState<MockTest[]>([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<Partial<Package> | null>(null);
   const [saving, setSaving] = useState(false);
   const [featureInput, setFeatureInput] = useState('');
+
+  useEffect(() => {
+    fetch('/api/admin/tests?limit=500')
+      .then(r => r.json())
+      .then(j => { if (j.success) setAllTests(j.data); })
+      .catch(() => {});
+  }, []);
 
   const fetch_ = useCallback(async () => {
     setLoading(true);
@@ -67,7 +76,9 @@ export default function AdminPackagesPage() {
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-xl font-display font-bold text-surface-900">Packages</h1>
         <button
-          onClick={() => setEditing({ name: '', price: 0, validityDays: 365, features: [], testIds: [], isActive: true })}
+          onClick={() => setEditing({
+            name: '', price: 0, validityDays: 365, features: [], testIds: [], mockTestAccessLimit: null, isActive: true,
+          })}
           className="btn-primary flex items-center gap-2 text-sm"
         >
           <Plus size={15} /> Add Package
@@ -98,6 +109,62 @@ export default function AdminPackagesPage() {
             <div className="sm:col-span-2">
               <label className="block text-xs font-semibold text-surface-700 mb-1">Description</label>
               <input value={editing.description || ''} onChange={e => setEditing(p => ({ ...p, description: e.target.value }))} className="input-base text-sm" placeholder="Short description..." />
+            </div>
+          </div>
+
+          {/* Mock tests in this package */}
+          <div className="mb-4">
+            <label className="block text-xs font-semibold text-surface-700 mb-2">Premium mock tests included</label>
+            <p className="text-xs text-surface-500 mb-2">
+              Order matters: if you set a limit below, subscribers only get the first N tests in this list.
+            </p>
+            <div className="max-h-48 overflow-y-auto border border-surface-200 rounded-lg p-2 space-y-1 bg-surface-50">
+              {allTests.length === 0 ? (
+                <p className="text-xs text-surface-400 p-2">Loading tests…</p>
+              ) : (
+                allTests.map(t => (
+                  <label
+                    key={t.id}
+                    className="flex items-center gap-2 text-xs text-surface-700 px-2 py-1.5 rounded-md hover:bg-white cursor-pointer"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={(editing.testIds || []).includes(t.id)}
+                      onChange={() => {
+                        setEditing(p => {
+                          const cur = [...(p?.testIds || [])];
+                          const i = cur.indexOf(t.id);
+                          if (i >= 0) cur.splice(i, 1);
+                          else cur.push(t.id);
+                          return { ...p, testIds: cur };
+                        });
+                      }}
+                      className="rounded border-surface-300"
+                    />
+                    <span className="truncate">{t.title}</span>
+                    <span className="text-surface-400 shrink-0">{t.type === 'premium' ? 'Premium' : 'Free'}</span>
+                  </label>
+                ))
+              )}
+            </div>
+            <div className="mt-3">
+              <label className="block text-xs font-semibold text-surface-700 mb-1">Mock test access cap (optional)</label>
+              <input
+                type="number"
+                min={1}
+                placeholder="Empty = all tests selected above"
+                value={editing.mockTestAccessLimit ?? ''}
+                onChange={e => {
+                  const v = e.target.value;
+                  setEditing(p => {
+                    if (v === '') return { ...p, mockTestAccessLimit: null };
+                    const n = parseInt(v, 10);
+                    return { ...p, mockTestAccessLimit: Number.isFinite(n) && n > 0 ? n : null };
+                  });
+                }}
+                className="input-base text-sm max-w-xs"
+              />
+              <p className="text-xs text-surface-400 mt-1">Example: list 50 tests but only unlock 10 for a starter plan.</p>
             </div>
           </div>
 
@@ -147,7 +214,9 @@ export default function AdminPackagesPage() {
               </div>
             </div>
           ))
-        ) : packages.map(pkg => (
+        ) : packages.map(pkg => {
+          const mockCount = accessibleMockTestCount(pkg);
+          return (
           <div key={pkg.id} className="card p-5 relative">
             <div className="flex items-start justify-between mb-3">
               <h3 className="font-bold text-surface-900">{pkg.name}</h3>
@@ -161,6 +230,11 @@ export default function AdminPackagesPage() {
               {pkg.discountedPrice && <span className="text-surface-400 line-through text-sm">{formatCurrency(pkg.price)}</span>}
             </div>
             <p className="text-xs text-surface-500 mb-3">Valid {pkg.validityDays} days</p>
+            {mockCount > 0 && (
+              <p className="text-xs font-semibold text-brand-700 mb-2">
+                {mockCount} mock test{mockCount === 1 ? '' : 's'} included
+              </p>
+            )}
             <ul className="space-y-1.5">
               {(pkg.features || []).slice(0, 4).map((f, i) => (
                 <li key={i} className="flex items-center gap-2 text-xs text-surface-600">
@@ -172,7 +246,8 @@ export default function AdminPackagesPage() {
               {pkg.isActive ? 'Active' : 'Hidden'}
             </div>
           </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

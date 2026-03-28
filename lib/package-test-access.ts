@@ -1,24 +1,5 @@
-import { query } from '@/lib/db';
-
-/** IDs a subscriber may open from one package row (order in `test_ids` matters when capped). */
-export function accessibleTestIdsFromPackage(
-  testIds: number[] | undefined,
-  mockTestAccessLimit?: number | null,
-): number[] {
-  const ids = Array.isArray(testIds)
-    ? testIds.map(Number).filter((n) => Number.isInteger(n) && n > 0)
-    : [];
-  const lim = mockTestAccessLimit;
-  if (lim == null || lim <= 0) return ids;
-  return ids.slice(0, lim);
-}
-
-export function accessibleMockTestCount(pkg: {
-  testIds?: number[];
-  mockTestAccessLimit?: number | null;
-}): number {
-  return accessibleTestIdsFromPackage(pkg.testIds, pkg.mockTestAccessLimit).length;
-}
+import { query } from "@/lib/db";
+import { accessibleTestIdsFromPackage } from "@/lib/package-test-shared";
 
 type PackageRow = {
   testIds: unknown;
@@ -26,11 +7,14 @@ type PackageRow = {
 };
 
 function normalizeTestIds(raw: unknown): number[] {
-  if (Array.isArray(raw)) return raw.map(Number).filter((n) => Number.isInteger(n) && n > 0);
-  if (typeof raw === 'string') {
+  if (Array.isArray(raw))
+    return raw.map(Number).filter((n) => Number.isInteger(n) && n > 0);
+  if (typeof raw === "string") {
     try {
       const p = JSON.parse(raw);
-      return Array.isArray(p) ? p.map(Number).filter((n) => Number.isInteger(n) && n > 0) : [];
+      return Array.isArray(p)
+        ? p.map(Number).filter((n) => Number.isInteger(n) && n > 0)
+        : [];
     } catch {
       return [];
     }
@@ -39,7 +23,9 @@ function normalizeTestIds(raw: unknown): number[] {
 }
 
 /** Union of all mock test IDs the user may access via active packages (not global premium). */
-export async function getUserAccessiblePackageTestIds(userId: number): Promise<Set<number>> {
+export async function getUserAccessiblePackageTestIds(
+  userId: number,
+): Promise<Set<number>> {
   const rows = await query<PackageRow>(
     `SELECT p.test_ids, p.mock_test_access_limit
      FROM user_packages up
@@ -63,8 +49,4 @@ export async function userCanAccessPremiumTestViaPackage(
 ): Promise<boolean> {
   const ids = await getUserAccessiblePackageTestIds(userId);
   return ids.has(testId);
-}
-
-export function hasFullPremiumPlan(plan: string | undefined): boolean {
-  return plan === 'premium' || plan === 'super';
 }

@@ -5,6 +5,7 @@ import { Check, Crown, Zap } from 'lucide-react';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { LoginModal } from '@/components/auth/LoginModal';
 import { formatCurrency, cn } from '@/lib/utils';
+import { accessibleMockTestCount } from '@/lib/package-test-shared';
 import toast from 'react-hot-toast';
 import type { Package } from '@/types';
 
@@ -105,6 +106,7 @@ export function PackagesClient({ packages }: { packages: Package[] }) {
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {packages.map((pkg, idx) => {
             const isHighlighted = idx === highlighted;
+            const mockCount = accessibleMockTestCount(pkg);
             const discount = pkg.price && pkg.discountedPrice
               ? Math.round(((pkg.price - pkg.discountedPrice) / pkg.price) * 100)
               : 0;
@@ -154,6 +156,12 @@ export function PackagesClient({ packages }: { packages: Package[] }) {
                   <p className="text-xs text-surface-500 mt-1">Valid for {pkg.validityDays} days</p>
                 </div>
 
+                {mockCount > 0 && (
+                  <p className="text-sm text-brand-700 font-semibold mb-3 flex items-center gap-2">
+                    <Check size={15} className="text-success-500 shrink-0" />
+                    Access to {mockCount} premium mock test{mockCount === 1 ? '' : 's'}
+                  </p>
+                )}
                 <ul className="space-y-2.5 mb-6 flex-1">
                   {(pkg.features || []).map((f) => (
                     <li key={f} className="flex items-start gap-2 text-sm text-surface-700">

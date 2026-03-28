@@ -1,9 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { X, Save, Plus, Trash2, CheckCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
-import type { Question } from '@/types';
+import type { Question, TestSection } from '@/types';
 
 interface Option {
   id: string;
@@ -34,6 +34,9 @@ export function QuestionFormModal({ question, testId, onClose, onSaved }: Props)
   const [marks, setMarks] = useState(question?.marks ?? 1);
   const [negativeMarks, setNegativeMarks] = useState(question?.negativeMarks ?? 0.25);
   const [difficulty, setDifficulty] = useState(question?.difficulty || 'medium');
+  const [sectionId, setSectionId] = useState<number | null>(question?.sectionId ?? null);
+  const [subject, setSubject] = useState(question?.subject?.trim() || '');
+  const [testSections, setTestSections] = useState<TestSection[]>([]);
   const [options, setOptions] = useState<Option[]>(
     question?.options
       ? question.options.map(o => ({ id: o.id, text: o.text, textHindi: o.textHindi || '', isCorrect: o.isCorrect }))
@@ -41,6 +44,33 @@ export function QuestionFormModal({ question, testId, onClose, onSaved }: Props)
   );
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<'en' | 'hi'>('en');
+
+  const loadSections = useCallback(async () => {
+    const res = await fetch(`/api/admin/sections?testId=${testId}`);
+    const json = await res.json();
+    if (json.success) setTestSections(json.data);
+  }, [testId]);
+
+  useEffect(() => {
+    loadSections();
+  }, [loadSections]);
+
+  useEffect(() => {
+    setText(question?.text || '');
+    setTextHindi(question?.textHindi || '');
+    setExplanation(question?.explanation || '');
+    setExplanationHindi(question?.explanationHindi || '');
+    setMarks(question?.marks ?? 1);
+    setNegativeMarks(question?.negativeMarks ?? 0.25);
+    setDifficulty(question?.difficulty || 'medium');
+    setSectionId(question?.sectionId ?? null);
+    setSubject(question?.subject?.trim() || '');
+    setOptions(
+      question?.options
+        ? question.options.map(o => ({ id: o.id, text: o.text, textHindi: o.textHindi || '', isCorrect: o.isCorrect }))
+        : DEFAULT_OPTIONS
+    );
+  }, [question?.id]);
 
   const updateOption = (idx: number, field: keyof Option, value: string | boolean) => {
     setOptions(prev => prev.map((o, i) => {
@@ -64,6 +94,8 @@ export function QuestionFormModal({ question, testId, onClose, onSaved }: Props)
       const payload = {
         ...(question ? { id: question.id } : {}),
         testId,
+        sectionId: testSections.length ? (sectionId ?? null) : undefined,
+        subject: subject.trim() || undefined,
         text,
         textHindi: textHindi || undefined,
         type: 'mcq',
@@ -163,6 +195,36 @@ export function QuestionFormModal({ question, testId, onClose, onSaved }: Props)
                   </button>
                 </div>
               ))}
+            </div>
+          </div>
+
+          {/* Subject (test_sections row) + free-text subject for filters */}
+          <div className="grid sm:grid-cols-2 gap-4">
+            {testSections.length > 0 && (
+              <div>
+                <label className="block text-xs font-semibold text-surface-700 mb-1">Subject (from test)</label>
+                <select
+                  value={sectionId ?? ''}
+                  onChange={e => setSectionId(e.target.value ? parseInt(e.target.value, 10) : null)}
+                  className="input-base text-sm w-full"
+                >
+                  <option value="">— None —</option>
+                  {testSections.map(s => (
+                    <option key={s.id} value={s.id}>{s.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+            <div className={testSections.length ? '' : 'sm:col-span-2'}>
+              <label className="block text-xs font-semibold text-surface-700 mb-1">Subject label (optional)</label>
+              <input
+                value={subject}
+                onChange={e => setSubject(e.target.value)}
+                className="input-base text-sm w-full"
+                placeholder="e.g. Quant, Reasoning, GK"
+                maxLength={100}
+              />
+              <p className="text-xs text-surface-400 mt-1">Shown in the attempt screen when the test has no subject rows, or alongside section grouping.</p>
             </div>
           </div>
 

@@ -4,7 +4,8 @@ import { paginationSchema } from '@/lib/validations';
 import { paginatedResponse, errorResponse } from '@/lib/security';
 import { verifyRequest } from '@/lib/auth/jwt';
 import type { MockTest } from '@/types';
-import { getUserAccessiblePackageTestIds, hasFullPremiumPlan } from '@/lib/package-test-access';
+import { hasFullPremiumPlan } from '@/lib/package-test-shared';
+import { getUserAccessiblePackageTestIds } from '@/lib/package-test-access';
 
 export async function GET(req: NextRequest) {
   try {
