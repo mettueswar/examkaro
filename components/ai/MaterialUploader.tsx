@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import {
   Upload,
   Link,
@@ -46,7 +46,7 @@ const TYPE_COLORS: Record<string, string> = {
 
 export function MaterialUploader() {
   const [materials, setMaterials] = useState<Material[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [activeInput, setActiveInput] = useState<
     "file" | "url" | "youtube" | "text" | null
@@ -58,15 +58,21 @@ export function MaterialUploader() {
 
   const fetchMaterials = useCallback(async () => {
     setLoading(true);
-    const res = await fetch("/api/ai/materials");
-    const json = await res.json();
-    if (json.success) setMaterials(json.data);
-    setLoading(false);
+    try {
+      const res = await fetch("/api/ai/materials");
+      const json = await res.json();
+      if (json.success) setMaterials(json.data);
+    } catch {
+      // silent fail
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  useState(() => {
+  // FIX: was useState(() => {...}) — must be useEffect
+  useEffect(() => {
     fetchMaterials();
-  });
+  }, [fetchMaterials]);
 
   const handleFileUpload = async (file: File) => {
     const formData = new FormData();

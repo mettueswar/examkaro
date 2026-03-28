@@ -1,37 +1,46 @@
-import { YoutubeTranscript } from 'youtube-transcript';
+import { YoutubeTranscript } from "youtube-transcript";
 
 // ─── YouTube transcript extractor ─────────────────────────────────────────────
-export async function extractYouTubeTranscript(url: string): Promise<{ text: string; title: string; duration?: number }> {
+export async function extractYouTubeTranscript(
+  url: string,
+): Promise<{ text: string; title: string; duration?: number }> {
   const videoId = extractYouTubeId(url);
-  if (!videoId) throw new Error('Invalid YouTube URL');
+  if (!videoId) throw new Error("Invalid YouTube URL");
 
   const transcriptItems = await YoutubeTranscript.fetchTranscript(videoId, {
-    lang: 'en',
-  }).catch(() =>
-    YoutubeTranscript.fetchTranscript(videoId, { lang: 'hi' }) // Try Hindi if English fails
-  );
+    lang: "en",
+  }).catch(() => YoutubeTranscript.fetchTranscript(videoId, { lang: "hi" }));
 
   const text = transcriptItems
-    .map(item => item.text)
-    .join(' ')
-    .replace(/\[.*?\]/g, '') // Remove [Music], [Applause] etc.
+    .map((item) => item.text)
+    .join(" ")
+    .replace(/\[.*?\]/g, "")
     .trim();
 
-  const duration = transcriptItems.length > 0
-    ? Math.ceil((transcriptItems[transcriptItems.length - 1].offset + transcriptItems[transcriptItems.length - 1].duration) / 1000)
-    : undefined;
+  const duration =
+    transcriptItems.length > 0
+      ? Math.ceil(
+          (transcriptItems[transcriptItems.length - 1].offset +
+            transcriptItems[transcriptItems.length - 1].duration) /
+            1000,
+        )
+      : undefined;
 
-  // Try to get title from oEmbed API (no key needed)
   let title = `YouTube Video (${videoId})`;
   try {
-    const res = await fetch(`https://www.youtube.com/oembed?url=https://youtu.be/${videoId}&format=json`, {
-      signal: AbortSignal.timeout(5000),
-    });
+    const res = await fetch(
+      `https://www.youtube.com/oembed?url=https://youtu.be/${videoId}&format=json`,
+      {
+        signal: AbortSignal.timeout(5000),
+      },
+    );
     if (res.ok) {
       const data = await res.json();
       title = data.title || title;
     }
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 
   return { text, title, duration };
 }
@@ -49,61 +58,89 @@ function extractYouTubeId(url: string): string | null {
 }
 
 // ─── Website URL extractor ─────────────────────────────────────────────────────
-export async function extractWebsiteContent(url: string): Promise<{ text: string; title: string }> {
-  if (!url.startsWith('http')) throw new Error('Invalid URL');
+export async function extractWebsiteContent(
+  url: string,
+): Promise<{ text: string; title: string }> {
+  if (!url.startsWith("http")) throw new Error("Invalid URL");
 
   const res = await fetch(url, {
     headers: {
-      'User-Agent': 'Mozilla/5.0 (compatible; ExamKaro/1.0; +https://examkaro.com)',
-      'Accept': 'text/html,application/xhtml+xml,application/xml',
+      "User-Agent":
+        "Mozilla/5.0 (compatible; ExamKaro/1.0; +https://examkaro.com)",
+      Accept: "text/html,application/xhtml+xml,application/xml",
     },
     signal: AbortSignal.timeout(10000),
   });
 
   if (!res.ok) throw new Error(`Failed to fetch URL: HTTP ${res.status}`);
-  const contentType = res.headers.get('content-type') || '';
-  if (!contentType.includes('text/html')) throw new Error('URL must point to an HTML page');
+  const contentType = res.headers.get("content-type") || "";
+  if (!contentType.includes("text/html"))
+    throw new Error("URL must point to an HTML page");
 
   const html = await res.text();
 
-  // Simple HTML → text extraction without cheerio to avoid SSR issues
-  const title = (html.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1] || 'Web Page').trim();
+  const title = (
+    html.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1] || "Web Page"
+  ).trim();
 
-  // Remove scripts, styles, nav, footer, header
   const cleaned = html
-    .replace(/<script[\s\S]*?<\/script>/gi, '')
-    .replace(/<style[\s\S]*?<\/style>/gi, '')
-    .replace(/<nav[\s\S]*?<\/nav>/gi, '')
-    .replace(/<footer[\s\S]*?<\/footer>/gi, '')
-    .replace(/<header[\s\S]*?<\/header>/gi, '')
-    .replace(/<[^>]+>/g, ' ')           // Strip remaining tags
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
+    .replace(/<script[\s\S]*?<\/script>/gi, "")
+    .replace(/<style[\s\S]*?<\/style>/gi, "")
+    .replace(/<nav[\s\S]*?<\/nav>/gi, "")
+    .replace(/<footer[\s\S]*?<\/footer>/gi, "")
+    .replace(/<header[\s\S]*?<\/header>/gi, "")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
     .replace(/&quot;/g, '"')
-    .replace(/\s{2,}/g, ' ')            // Collapse whitespace
+    .replace(/\s{2,}/g, " ")
     .trim();
 
-  if (cleaned.length < 100) throw new Error('Could not extract meaningful content from this URL');
+  if (cleaned.length < 100)
+    throw new Error("Could not extract meaningful content from this URL");
 
   return { text: cleaned.slice(0, 50000), title };
 }
 
 // ─── PDF extractor (server-side only) ────────────────────────────────────────
-export async function extractPDFContent(buffer: Buffer): Promise<{ text: string; pageCount: number }> {
-  // Dynamic import to avoid build errors
-  const pdfParse = (await import('pdf-parse')).default;
+export async function extractPDFContent(
+  buffer: Buffer,
+): Promise<{ text: string; pageCount: number }> {
+  // FIX: pdf-parse may export as CommonJS module; handle both default and named exports
+  let pdfParse: (buffer: Buffer) => Promise<{ text: string; numpages: number }>;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    pdfParse = require("pdf-parse");
+    // Some versions wrap it in a .default
+    if (
+      typeof pdfParse !== "function" &&
+      (pdfParse as unknown as { default: typeof pdfParse }).default
+    ) {
+      pdfParse = (pdfParse as unknown as { default: typeof pdfParse }).default;
+    }
+  } catch {
+    const mod = await import("pdf-parse");
+    pdfParse = (mod.default ?? mod) as unknown as typeof pdfParse;
+  }
+
+  if (typeof pdfParse !== "function") {
+    throw new Error("pdf-parse module could not be loaded as a function");
+  }
+
   const data = await pdfParse(buffer);
   return {
-    text: data.text.replace(/\s{3,}/g, '\n\n').trim(),
+    text: data.text.replace(/\s{3,}/g, "\n\n").trim(),
     pageCount: data.numpages,
   };
 }
 
 // ─── DOCX extractor (server-side only) ───────────────────────────────────────
-export async function extractDOCXContent(buffer: Buffer): Promise<{ text: string }> {
-  const mammoth = await import('mammoth');
+export async function extractDOCXContent(
+  buffer: Buffer,
+): Promise<{ text: string }> {
+  const mammoth = await import("mammoth");
   const result = await mammoth.extractRawText({ buffer });
   return { text: result.value.trim() };
 }
@@ -111,9 +148,9 @@ export async function extractDOCXContent(buffer: Buffer): Promise<{ text: string
 // ─── Plain text cleaner ───────────────────────────────────────────────────────
 export function cleanText(text: string): string {
   return text
-    .replace(/\r\n/g, '\n')
-    .replace(/\n{3,}/g, '\n\n')
-    .replace(/[ \t]{2,}/g, ' ')
+    .replace(/\r\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .replace(/[ \t]{2,}/g, " ")
     .trim();
 }
 
