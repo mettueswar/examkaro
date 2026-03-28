@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import Image from 'next/image';
 import {
   ChevronLeft, ChevronRight, Flag, RotateCcw,
@@ -11,7 +11,7 @@ import {
 import { useTestAttempt } from '@/hooks/useTestAttempt';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { formatTime, cn } from '@/lib/utils';
-import type { QuestionStatus, TestSection } from '@/types';
+import type { Question, QuestionStatus, TestSection } from '@/types';
 import toast from 'react-hot-toast';
 
 interface Props { attemptId: number }
@@ -34,7 +34,8 @@ export function TestAttemptScreen({ attemptId }: Props) {
   } = useTestAttempt(attemptId);
 
   // ─── UI State ───────────────────────────────────────────────────────────────
-  const [activeSection, setActiveSection] = useState<number | 'all'>('all');
+  /** 'all' | `sec:${id}` | `subj:${encodeURIComponent(name)}` */
+  const [filterKey, setFilterKey] = useState('all');
   const [language, setLanguage] = useState<'english' | 'hindi'>('english');
   const [translating, setTranslating] = useState(false);
   const [translatedQ, setTranslatedQ] = useState('');

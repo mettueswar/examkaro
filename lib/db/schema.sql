@@ -552,3 +552,7 @@ CREATE TABLE IF NOT EXISTS ai_usage (
 -- Add subject column to questions for subject-wise filtering in tests
 ALTER TABLE questions ADD COLUMN IF NOT EXISTS subject VARCHAR(100) NULL AFTER section_id;
 ALTER TABLE questions ADD INDEX IF NOT EXISTS idx_subject (subject);
+
+-- Cap how many mock tests from test_ids (in array order) a package unlocks; NULL = all listed
+ALTER TABLE packages ADD COLUMN IF NOT EXISTS mock_test_access_limit INT NULL
+  COMMENT 'Max tests from test_ids order; NULL = all';

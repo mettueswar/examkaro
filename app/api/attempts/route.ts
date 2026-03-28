@@ -20,6 +20,16 @@ export async function POST(req: NextRequest) {
     );
     if (!test) return errorResponse('Test not found', 404);
 
+    if (test.type === 'premium') {
+      const { hasFullPremiumPlan, userCanAccessPremiumTestViaPackage } = await import(
+        '@/lib/package-test-access'
+      );
+      if (!hasFullPremiumPlan(auth.plan)) {
+        const ok = await userCanAccessPremiumTestViaPackage(auth.userId, testId);
+        if (!ok) return errorResponse('Upgrade or purchase a package to access this test', 403);
+      }
+    }
+
     // Check for existing in-progress attempt
     const existing = await queryOne<TestAttempt>(
       `SELECT * FROM test_attempts WHERE user_id = ? AND test_id = ? AND status = 'in_progress'`,
@@ -29,7 +39,7 @@ export async function POST(req: NextRequest) {
     if (existing) {
       // Resume existing attempt
       const questions = await query<Question>(
-        `SELECT id, test_id, section_id, text, text_hindi, type, options, image,
+        `SELECT id, test_id, section_id, subject, text, text_hindi, type, options, image,
                 marks, negative_marks, difficulty, order_index
          FROM questions WHERE test_id = ? AND is_active = 1 ORDER BY order_index`,
         [testId]
@@ -63,7 +73,7 @@ export async function POST(req: NextRequest) {
 
     // Re-fetch with proper field — send options without correct flag
     const questionsClean = await query<Question>(
-      `SELECT id, test_id, section_id, text, text_hindi, type,
+      `SELECT id, test_id, section_id, subject, text, text_hindi, type,
               options, image, marks, negative_marks, difficulty, order_index
        FROM questions WHERE test_id = ? AND is_active = 1 ORDER BY order_index`,
       [testId]

@@ -16,9 +16,15 @@ import type { MockTest, TestSection } from '@/types';
 interface Props {
   test: MockTest & { category_name?: string; category_slug?: string };
   sections: TestSection[];
+  /** Server-detected: user has this test in an active purchased package */
+  unlockedViaPackage?: boolean;
 }
 
-export function TestStartClient({ test, sections }: Props) {
+function hasPaidSitePlan(plan: string | undefined): boolean {
+  return plan === 'premium' || plan === 'super';
+}
+
+export function TestStartClient({ test, sections, unlockedViaPackage = false }: Props) {
   const { user } = useAuth();
   const router = useRouter();
   const [loginOpen, setLoginOpen] = useState(false);
@@ -26,7 +32,10 @@ export function TestStartClient({ test, sections }: Props) {
   const [language, setLanguage] = useState<'english' | 'hindi'>('english');
   const [starting, setStarting] = useState(false);
 
-  const isLocked = test.type === 'premium' && user?.plan !== 'premium';
+  const isLocked =
+    test.type === 'premium' &&
+    !hasPaidSitePlan(user?.plan) &&
+    !unlockedViaPackage;
 
   const handleStartAttempt = async () => {
     if (!user) { setLoginOpen(true); return; }
@@ -113,10 +122,10 @@ export function TestStartClient({ test, sections }: Props) {
             </div>
           </div>
 
-          {/* Sections */}
+          {/* Subjects (test_sections) */}
           {sections.length > 0 && (
             <div className="card p-5">
-              <h3 className="font-semibold text-surface-800 mb-3 text-sm">Sections ({sections.length})</h3>
+              <h3 className="font-semibold text-surface-800 mb-3 text-sm">Subjects ({sections.length})</h3>
               <div className="space-y-2">
                 {sections.map((s) => (
                   <div key={s.id} className="flex items-center justify-between text-sm px-3 py-2 bg-surface-50 rounded-lg">

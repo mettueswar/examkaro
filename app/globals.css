@@ -118,3 +118,7 @@
     @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-surface-200 text-surface-500;
   }
 }
+
+button {
+  cursor: pointer;
+}

@@ -4,6 +4,7 @@ import { paginationSchema } from '@/lib/validations';
 import { paginatedResponse, errorResponse } from '@/lib/security';
 import { verifyRequest } from '@/lib/auth/jwt';
 import type { MockTest } from '@/types';
+import { getUserAccessiblePackageTestIds, hasFullPremiumPlan } from '@/lib/package-test-access';
 
 export async function GET(req: NextRequest) {
   try {
@@ -56,11 +57,18 @@ export async function GET(req: NextRequest) {
       [...values, limit, offset]
     );
 
-    // If not premium user, mark premium tests but don't block listing
     const userPlan = auth?.plan ?? 'free';
+    const fullPremium = hasFullPremiumPlan(userPlan);
+    let packageTestIds: Set<number> | null = null;
+    if (auth && !fullPremium) {
+      packageTestIds = await getUserAccessiblePackageTestIds(auth.userId);
+    }
     const processedTests = tests.map((t: MockTest & Record<string, unknown>) => ({
       ...t,
-      locked: t.type === 'premium' && userPlan !== 'premium',
+      locked:
+        t.type === 'premium' &&
+        !fullPremium &&
+        !(packageTestIds?.has(t.id) ?? false),
     }));
 
     return paginatedResponse(processedTests, countResult.total, page, limit);

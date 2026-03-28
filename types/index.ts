@@ -1,6 +1,6 @@
 // ─── User ───────────────────────────────────────────────────────────────────
-export type UserPlan = 'free' | 'premium' | 'super';
-export type SubscriptionBilling = 'monthly' | 'quarterly' | 'yearly';
+export type UserPlan = "free" | "premium" | "super";
+export type SubscriptionBilling = "monthly" | "quarterly" | "yearly";
 
 export interface User {
   id: number;
@@ -9,7 +9,7 @@ export interface User {
   email: string;
   phone?: string;
   avatar?: string;
-  role: 'user' | 'admin' | 'moderator';
+  role: "user" | "admin" | "moderator";
   plan: UserPlan;
   planExpiry?: Date | string;
   isActive?: boolean;
@@ -34,9 +34,9 @@ export interface Category {
 }
 
 // ─── Mock Test ────────────────────────────────────────────────────────────────
-export type TestLanguage = 'hindi' | 'english' | 'both';
-export type TestType = 'free' | 'premium';
-export type DifficultyLevel = 'easy' | 'medium' | 'hard';
+export type TestLanguage = "hindi" | "english" | "both";
+export type TestType = "free" | "premium";
+export type DifficultyLevel = "easy" | "medium" | "hard";
 
 export interface MockTest {
   id: number;
@@ -63,7 +63,7 @@ export interface MockTest {
 }
 
 // ─── Question ─────────────────────────────────────────────────────────────────
-export type QuestionType = 'mcq' | 'true_false' | 'fill_blank';
+export type QuestionType = "mcq" | "true_false" | "fill_blank";
 
 export interface Option {
   id: string;
@@ -104,7 +104,12 @@ export interface TestSection {
 }
 
 // ─── Test Attempt ─────────────────────────────────────────────────────────────
-export type QuestionStatus = 'not_visited' | 'not_answered' | 'answered' | 'marked' | 'answered_marked';
+export type QuestionStatus =
+  | "not_visited"
+  | "not_answered"
+  | "answered"
+  | "marked"
+  | "answered_marked";
 
 export interface QuestionAttempt {
   questionId: number;
@@ -131,8 +136,8 @@ export interface TestAttempt {
   timeTaken?: number;
   rank?: number;
   percentile?: number;
-  language?: 'hindi' | 'english';
-  status: 'in_progress' | 'submitted' | 'expired';
+  language?: "hindi" | "english";
+  status: "in_progress" | "submitted" | "expired";
 }
 
 // ─── Package ──────────────────────────────────────────────────────────────────
@@ -145,6 +150,8 @@ export interface Package {
   discountedPrice?: number;
   validityDays: number;
   testIds: number[];
+  /** When set, only the first N IDs in testIds (in order) are unlocked. Omit or ≤0 = all listed. */
+  mockTestAccessLimit?: number | null;
   tests?: MockTest[];
   categoryIds?: number[];
   isActive: boolean;
@@ -155,7 +162,7 @@ export interface Package {
 }
 
 // ─── Payment ──────────────────────────────────────────────────────────────────
-export type PaymentStatus = 'pending' | 'success' | 'failed' | 'refunded';
+export type PaymentStatus = "pending" | "success" | "failed" | "refunded";
 
 export interface Payment {
   id: number;
@@ -208,7 +215,7 @@ export interface AuthPayload {
   userId: number;
   uid: string;
   email: string;
-  role: User['role'];
+  role: User["role"];
   plan: UserPlan;
 }
 
@@ -220,7 +227,7 @@ export interface TestState {
   currentSectionIndex: number;
   answers: Record<number, QuestionAttempt>;
   timeLeft: number;
-  language: 'hindi' | 'english';
+  language: "hindi" | "english";
   sections: TestSection[];
   questions: Question[];
   isSubmitting: boolean;
@@ -228,7 +235,7 @@ export interface TestState {
 }
 
 // ─── AI Study Material ────────────────────────────────────────────────────────
-export type SourceType = 'pdf' | 'docx' | 'website' | 'youtube' | 'text';
+export type SourceType = "pdf" | "docx" | "website" | "youtube" | "text";
 
 export interface StudyMaterial {
   id: number;
@@ -239,7 +246,7 @@ export interface StudyMaterial {
   content: string;
   summary?: string;
   wordCount?: number;
-  status: 'processing' | 'ready' | 'error';
+  status: "processing" | "ready" | "error";
   errorMessage?: string;
   createdAt?: Date | string;
 }
@@ -262,7 +269,7 @@ export interface Flashcard {
   front: string;
   back: string;
   hint?: string;
-  difficulty: 'easy' | 'medium' | 'hard';
+  difficulty: "easy" | "medium" | "hard";
   timesReviewed: number;
   timesCorrect: number;
   nextReview?: Date | string;

@@ -3,6 +3,10 @@ import { queryOne, query } from '@/lib/db';
 import { errorResponse, successResponse } from '@/lib/security';
 import { verifyRequest, unauthorizedResponse, forbiddenResponse } from '@/lib/auth/jwt';
 import type { MockTest, Question, TestSection } from '@/types';
+import {
+  hasFullPremiumPlan,
+  userCanAccessPremiumTestViaPackage,
+} from '@/lib/package-test-access';
 
 export async function GET(
   req: NextRequest,
@@ -25,16 +29,11 @@ export async function GET(
     // Access check for premium tests
     if (test.type === 'premium') {
       if (!auth) return unauthorizedResponse('Login to access this test');
-      if (auth.plan !== 'premium') {
-        // Check if user has a package that includes this test
-        const hasAccess = await queryOne(
-          `SELECT up.id FROM user_packages up
-           JOIN packages p ON up.package_id = p.id
-           WHERE up.user_id = ? AND up.is_active = 1 AND up.valid_until > NOW()
-           AND JSON_CONTAINS(p.test_ids, ?)`,
-          [auth.userId, String(test.id)]
-        );
-        if (!hasAccess) return forbiddenResponse('Upgrade to Premium to access this test');
+      if (!hasFullPremiumPlan(auth.plan)) {
+        const hasAccess = await userCanAccessPremiumTestViaPackage(auth.userId, test.id);
+        if (!hasAccess) {
+          return forbiddenResponse('Upgrade or purchase a package to access this test');
+        }
       }
     }
 
