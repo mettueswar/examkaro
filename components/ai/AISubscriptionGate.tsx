@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Crown,
   Check,
@@ -23,77 +23,70 @@ declare global {
   }
 }
 
-const PLANS = [
+interface Plan {
+  id: number;
+  name: string;
+  slug: string;
+  billing: "monthly" | "quarterly" | "yearly";
+  price: number;
+  discountedPrice?: number | null;
+  aiCreditsPerMonth: number;
+  features: string[];
+  isActive: boolean;
+}
+
+const BILLING_LABELS = {
+  monthly: "Monthly",
+  quarterly: "Quarterly",
+  yearly: "Yearly",
+};
+const BILLING_DAYS = { monthly: 30, quarterly: 90, yearly: 365 };
+const POPULAR_BILLING = "quarterly";
+
+const FEATURE_ICONS = [
   {
-    id: 1,
-    slug: "super-monthly",
-    billing: "Monthly",
-    price: 199,
-    discountedPrice: 149,
-    validityDays: 30,
-    popular: false,
-    badge: "",
-    features: [
-      "50 AI Credits/month",
-      "PDF & DOCX Upload",
-      "YouTube Transcription",
-      "Website Extraction",
-      "Flashcard Generator",
-      "Quiz Generator",
-      "All Premium Mock Tests",
-    ],
+    icon: FileText,
+    label: "PDF & DOCX Upload",
+    desc: "Extract content from documents",
   },
+  { icon: Play, label: "YouTube Transcription", desc: "Learn from any video" },
+  { icon: Link, label: "Website Extraction", desc: "Import from any webpage" },
   {
-    id: 2,
-    slug: "super-quarterly",
-    billing: "Quarterly",
-    price: 499,
-    discountedPrice: 399,
-    validityDays: 90,
-    popular: true,
-    badge: "Most Popular",
-    features: [
-      "150 AI Credits",
-      "All Monthly Features",
-      "Save 11% vs Monthly",
-      "Priority Support",
-      "Bilingual Content",
-    ],
+    icon: Layers,
+    label: "AI Flashcard Decks",
+    desc: "Gemini-powered study cards",
   },
-  {
-    id: 3,
-    slug: "super-yearly",
-    billing: "Yearly",
-    price: 1499,
-    discountedPrice: 1199,
-    validityDays: 365,
-    popular: false,
-    badge: "Best Value",
-    features: [
-      "Unlimited AI Credits",
-      "All Quarterly Features",
-      "Save 33% vs Monthly",
-      "Study Analytics",
-      "Early Access to Features",
-    ],
-  },
+  { icon: Brain, label: "AI Quiz Generation", desc: "MCQs from your material" },
+  { icon: Zap, label: "Hindi + English", desc: "Bilingual content support" },
 ];
 
 export function AISubscriptionGate() {
   const { user } = useAuth();
   const [loginOpen, setLoginOpen] = useState(false);
   const [purchasing, setPurchasing] = useState<number | null>(null);
+  const [plans, setPlans] = useState<Plan[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const handleSubscribe = async (planIdx: number) => {
-    const plan = PLANS[planIdx];
+  useEffect(() => {
+    fetch("/api/subscriptions")
+      .then((r) => r.json())
+      .then((json) => {
+        if (json.success && json.data?.plans) {
+          setPlans(json.data.plans.filter((p: Plan) => p.isActive));
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  const handleSubscribe = async (plan: Plan) => {
     if (!user) {
       setLoginOpen(true);
       return;
     }
-    setPurchasing(planIdx);
+    setPurchasing(plan.id);
 
     try {
-      // Load Razorpay
       if (!window.Razorpay) {
         await new Promise<void>((res, rej) => {
           const s = document.createElement("script");
@@ -104,18 +97,10 @@ export function AISubscriptionGate() {
         });
       }
 
-      // Get plan ID from API
-      const plansRes = await fetch("/api/subscriptions");
-      const plansJson = await plansRes.json();
-      const serverPlan = plansJson.data?.plans?.find(
-        (p: { slug: string; id: number }) => p.slug === plan.slug,
-      );
-      if (!serverPlan) throw new Error("Plan not found");
-
       const orderRes = await fetch("/api/subscriptions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ planId: serverPlan.id }),
+        body: JSON.stringify({ planId: plan.id }),
       });
       const orderJson = await orderRes.json();
       if (!orderJson.success) throw new Error(orderJson.error);
@@ -127,7 +112,7 @@ export function AISubscriptionGate() {
         amount,
         currency: "INR",
         name: "ExamKaro Super",
-        description: `${plan.billing} AI Subscription`,
+        description: `${plan.name} — ${BILLING_LABELS[plan.billing]}`,
         order_id: orderId,
         prefill: { email: user.email, name: user.name },
         handler: async (response: {
@@ -142,7 +127,7 @@ export function AISubscriptionGate() {
               orderId: response.razorpay_order_id,
               paymentId: response.razorpay_payment_id,
               signature: response.razorpay_signature,
-              planId: serverPlan.id,
+              planId: plan.id,
             }),
           });
           const verifyJson = await verifyRes.json();
@@ -164,34 +149,10 @@ export function AISubscriptionGate() {
     }
   };
 
-  const features = [
-    {
-      icon: FileText,
-      label: "Upload PDF & DOCX",
-      desc: "Extract content from documents",
-    },
-    {
-      icon: Play,
-      label: "YouTube Transcription",
-      desc: "Learn from any video",
-    },
-    {
-      icon: Link,
-      label: "Website Extraction",
-      desc: "Import from any webpage",
-    },
-    {
-      icon: Layers,
-      label: "AI Flashcard Decks",
-      desc: "Gemini-powered study cards",
-    },
-    {
-      icon: Brain,
-      label: "AI Quiz Generation",
-      desc: "MCQs from your material",
-    },
-    { icon: Zap, label: "Hindi + English", desc: "Bilingual content support" },
-  ];
+  const discountPct = (plan: Plan) =>
+    plan.price && plan.discountedPrice
+      ? Math.round(((plan.price - plan.discountedPrice) / plan.price) * 100)
+      : 0;
 
   return (
     <div>
@@ -212,7 +173,7 @@ export function AISubscriptionGate() {
 
       {/* Feature grid */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-8">
-        {features.map(({ icon: Icon, label, desc }) => (
+        {FEATURE_ICONS.map(({ icon: Icon, label, desc }) => (
           <div key={label} className="card p-4 text-center">
             <div className="w-10 h-10 bg-violet-100 rounded-xl flex items-center justify-center mx-auto mb-2">
               <Icon size={18} className="text-violet-600" />
@@ -227,84 +188,131 @@ export function AISubscriptionGate() {
       <h3 className="text-lg font-display font-bold text-surface-900 mb-4 text-center">
         Choose Your Plan
       </h3>
-      <div className="grid sm:grid-cols-3 gap-4 mb-6">
-        {PLANS.map((plan, idx) => {
-          const discount = Math.round(
-            ((plan.price - plan.discountedPrice) / plan.price) * 100,
-          );
-          return (
-            <div
-              key={plan.id}
-              className={cn(
-                "card p-5 relative flex flex-col",
-                plan.popular && "border-violet-500 ring-2 ring-violet-500/20",
-              )}
-            >
-              {(plan.badge || plan.popular) && (
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-violet-600 text-white text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1">
-                  <Zap size={10} /> {plan.badge || "Popular"}
-                </div>
-              )}
-              {discount > 0 && (
-                <div className="absolute top-3 right-3 bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
-                  {discount}% OFF
-                </div>
-              )}
 
-              <p className="font-bold text-surface-900 text-base mb-1">
-                {plan.billing}
-              </p>
-              <div className="flex items-baseline gap-2 mb-1">
-                <span className="text-2xl font-display font-bold text-surface-900">
-                  {formatCurrency(plan.discountedPrice)}
-                </span>
-                {plan.discountedPrice < plan.price && (
-                  <span className="text-surface-400 line-through text-sm">
-                    {formatCurrency(plan.price)}
-                  </span>
-                )}
-              </div>
-              <p className="text-xs text-surface-400 mb-4">
-                {plan.validityDays} days validity
-              </p>
-
-              <ul className="space-y-2 mb-5 flex-1">
-                {plan.features.map((f) => (
-                  <li
-                    key={f}
-                    className="flex items-start gap-2 text-xs text-surface-600"
-                  >
-                    <Check
-                      size={13}
-                      className="text-green-500 shrink-0 mt-0.5"
-                    />{" "}
-                    {f}
-                  </li>
+      {loading ? (
+        <div className="grid sm:grid-cols-3 gap-4 mb-6">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="card p-5 animate-pulse space-y-3">
+              <div className="h-5 bg-surface-200 rounded w-3/4" />
+              <div className="h-8 bg-surface-200 rounded w-1/2" />
+              <div className="space-y-2">
+                {[1, 2, 3].map((j) => (
+                  <div key={j} className="h-3 bg-surface-100 rounded" />
                 ))}
-              </ul>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : plans.length === 0 ? (
+        <div className="card p-10 text-center mb-6">
+          <Brain size={32} className="text-surface-300 mx-auto mb-3" />
+          <p className="text-surface-500 font-medium">
+            No plans available right now
+          </p>
+          <p className="text-sm text-surface-400 mt-1">
+            Check back soon or contact support
+          </p>
+        </div>
+      ) : (
+        <div
+          className={cn(
+            "grid gap-4 mb-6",
+            plans.length === 1
+              ? "sm:grid-cols-1 max-w-sm mx-auto"
+              : plans.length === 2
+                ? "sm:grid-cols-2"
+                : "sm:grid-cols-3",
+          )}
+        >
+          {plans.map((plan) => {
+            const isPopular = plan.billing === POPULAR_BILLING;
+            const disc = discountPct(plan);
 
-              <button
-                onClick={() => handleSubscribe(idx)}
-                disabled={purchasing === idx}
+            return (
+              <div
+                key={plan.id}
                 className={cn(
-                  "w-full py-2.5 rounded-xl font-semibold text-sm transition-all",
-                  plan.popular
-                    ? "bg-violet-600 hover:bg-violet-700 text-white"
-                    : "border-2 border-violet-500 text-violet-700 hover:bg-violet-50",
+                  "card p-5 relative flex flex-col",
+                  isPopular && "border-violet-500 ring-2 ring-violet-500/20",
                 )}
               >
-                {purchasing === idx ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <Loader2 size={14} className="animate-spin" /> Processing...
-                  </span>
-                ) : (
-                  `Subscribe — ${formatCurrency(plan.discountedPrice)}`
+                {isPopular && (
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-violet-600 text-white text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1">
+                    <Zap size={10} /> Most Popular
+                  </div>
                 )}
-              </button>
-            </div>
-          );
-        })}
-      </div>
+                {disc > 0 && (
+                  <div className="absolute top-3 right-3 bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+                    {disc}% OFF
+                  </div>
+                )}
+
+                <p className="font-bold text-surface-900 text-base mb-1">
+                  {plan.name}
+                </p>
+                <p className="text-xs text-surface-400 mb-2">
+                  {BILLING_LABELS[plan.billing]} · {BILLING_DAYS[plan.billing]}{" "}
+                  days
+                </p>
+
+                <div className="flex items-baseline gap-2 mb-1">
+                  <span className="text-2xl font-display font-bold text-surface-900">
+                    {formatCurrency(plan.discountedPrice ?? plan.price)}
+                  </span>
+                  {plan.discountedPrice &&
+                    plan.discountedPrice < plan.price && (
+                      <span className="text-surface-400 line-through text-sm">
+                        {formatCurrency(plan.price)}
+                      </span>
+                    )}
+                </div>
+
+                <div className="flex items-center gap-1.5 mb-4 text-violet-700">
+                  <Zap size={12} className="text-violet-500" />
+                  <span className="text-xs font-semibold">
+                    {plan.aiCreditsPerMonth} AI credits/month
+                  </span>
+                </div>
+
+                <ul className="space-y-2 mb-5 flex-1">
+                  {(plan.features || []).map((f, i) => (
+                    <li
+                      key={i}
+                      className="flex items-start gap-2 text-xs text-surface-600"
+                    >
+                      <Check
+                        size={13}
+                        className="text-green-500 shrink-0 mt-0.5"
+                      />{" "}
+                      {f}
+                    </li>
+                  ))}
+                </ul>
+
+                <button
+                  onClick={() => handleSubscribe(plan)}
+                  disabled={purchasing === plan.id}
+                  className={cn(
+                    "w-full py-2.5 rounded-xl font-semibold text-sm transition-all",
+                    isPopular
+                      ? "bg-violet-600 hover:bg-violet-700 text-white"
+                      : "border-2 border-violet-500 text-violet-700 hover:bg-violet-50",
+                  )}
+                >
+                  {purchasing === plan.id ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <Loader2 size={14} className="animate-spin" />{" "}
+                      Processing...
+                    </span>
+                  ) : (
+                    `Subscribe — ${formatCurrency(plan.discountedPrice ?? plan.price)}`
+                  )}
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       <p className="text-center text-xs text-surface-400">
         🔒 Secure payment via Razorpay · Cancel anytime · 7-day money-back

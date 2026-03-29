@@ -6,6 +6,7 @@ const nextConfig: NextConfig = {
       allowedOrigins: ["examkaro.com", "localhost:3000"],
     },
   },
+
   images: {
     remotePatterns: [
       {

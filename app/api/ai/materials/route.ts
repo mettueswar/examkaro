@@ -14,8 +14,6 @@ import {
 import {
   extractYouTubeTranscript,
   extractWebsiteContent,
-  extractPDFContent,
-  extractDOCXContent,
   cleanText,
   wordCount,
 } from "@/lib/ai/extractor";
@@ -44,14 +42,18 @@ export async function GET(req: NextRequest) {
       [auth.userId],
     );
 
+    // FIX: "type" column does not exist — schema uses "source_type".
+    // Alias it as "type" so the frontend interface (Material.type) keeps working.
     const materials = await query(
-      `SELECT id, title, type, source_url, word_count, status, error_message, created_at
+      `SELECT id, title, source_type as type, source_url, word_count,
+              status, error_message, created_at
        FROM study_materials WHERE user_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?`,
       [auth.userId, limit, offset],
     );
 
     return paginatedResponse(materials, total, page, limit);
-  } catch {
+  } catch (err) {
+    console.error("Materials GET error:", err);
     return errorResponse("Failed to fetch materials");
   }
 }
@@ -94,13 +96,14 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // FIX: INSERT used "type" column which doesn't exist — schema column is "source_type"
     const result = await execute(
-      `INSERT INTO study_materials (user_id, title, type, source_url, content, word_count, status, metadata)
+      `INSERT INTO study_materials (user_id, title, source_type, source_url, content, word_count, status, metadata)
        VALUES (?, ?, ?, ?, ?, ?, 'ready', ?)`,
       [
         auth.userId,
         materialTitle,
-        type,
+        type, // value: 'url' | 'youtube' | 'text'
         url || null,
         extractedText,
         wordCount(extractedText),
@@ -136,11 +139,11 @@ export async function DELETE(req: NextRequest) {
   const id = req.nextUrl.searchParams.get("id");
   if (!id) return errorResponse("id required");
 
-  const material = await queryOne(
+  const material = await queryOne<{ userId: number }>(
     "SELECT user_id FROM study_materials WHERE id = ?",
     [id],
   );
-  if (!material || (material as { userId: number }).userId !== auth.userId) {
+  if (!material || material.userId !== auth.userId) {
     return errorResponse("Not found", 404);
   }
 
